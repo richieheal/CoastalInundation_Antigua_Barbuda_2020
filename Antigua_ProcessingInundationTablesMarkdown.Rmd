@@ -1,0 +1,609 @@
+---
+title: "Antigua IRMA Analysis Inundation Tables"
+author: "Richard Heal"
+date: "25 March 2020"
+output: 
+  html_document: 
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#####################################################################
+#
+# Script to auto-load the tables generated (CSV) and extract data
+#
+#####################################################################
+workingDirectory <- "D:\\Cefas\\A&B\\InundationTables\\AntiguaCSVFiles"
+setwd(workingDirectory)
+
+# Get the libraries needed
+library(kableExtra)
+library(data.table)
+
+```
+
+# Antigua Impact Tables
+
+This document records the processing of data tables generated using the intersection of classified run up water rasters with elements on the islands such as infrastructure, transport and conserved areas.
+
+The data is taken from the automatically processed data files that is present as csv file tables showing the intersection between features and the gridcode associated with them.<p style = "color:red"> At present all grid code values are used but this could be easily altered to reflect bridge heights etc. </p>
+
+
+```{r Load in the data, echo=FALSE, warning=FALSE, message=FALSE}
+# Data is present as a single set of csv files showing the intersection between the classified inundation layer and the features
+
+# Data is across 13 data tables
+# airport_facilities = point layer = number affected
+# airports = polygon = area affected
+# boreholes = points
+# bridges = line
+# cellTowers = point
+options(knitr.kable.NA = '')
+TableStems <- c("Antigua_InundationTable_ADM_ATG_Landmass_2005_84",
+                "Antigua_InundationTable_HDR_ATG_Waterbodies_2019_84",
+                "Antigua_InundationTable_INF_ATG_AccessRoad_APUA",
+                "Antigua_InundationTable_INF_ATG_Airports_hotosm",
+                "Antigua_InundationTable_INF_ATG_APUA_ElectricityWires",
+                "Antigua_InundationTable_INF_ATG_APUA_Substations",
+                "Antigua_InundationTable_INF_ATG_Buildings_2010_84",
+                "Antigua_InundationTable_INF_ATG_BusRoutes_2019_84",
+                "Antigua_InundationTable_INF_ATG_DamsReservoirs_APUA",
+                "Antigua_InundationTable_INF_ATG_EducationFacility",
+                "Antigua_InundationTable_INF_ATG_EVCharging_2019_84",
+                "Antigua_InundationTable_INF_ATG_FireStation",
+                "Antigua_InundationTable_INF_ATG_GasStations_2016_84",
+                "Antigua_InundationTable_INF_ATG_PoliceFacilities",
+                "Antigua_InundationTable_INF_ATG_PumpingStations_APUA",
+                "Antigua_InundationTable_INF_ATG_ReligiousCentres",
+                "Antigua_InundationTable_INF_ATG_SeaPorts_hotosm",
+                "Antigua_InundationTable_INF_ATG_WaterPipelines_APUA",
+                "Antigua_InundationTable_INF_ATG_WaterTanks_APUA",
+                "Antigua_InundationTable_INF_ATG_WaterTreatmentPlant_APUA",
+                "Antigua_InundationTable_INF_ATG_Wells_APUA",
+                "Antigua_InundationTable_PRT_ATG_BPNP_2019_84",
+                "Antigua_InundationTable_PRT_ATG_DevilsBridge_2010_84",
+                "Antigua_InundationTable_PRT_ATG_FortBarrington_2010_84",
+                "Antigua_InundationTable_PRT_ATG_GreenCastleHill_2010_84",
+                "Antigua_InundationTable_PRT_ATG_NelsonsDockyard_2010_84",
+                "Antigua_InundationTable_PRT_ATG_SMMA_2019_84",
+                "Antigua_InundationTable_SOC_ATG_Clinics_2016_84",
+                "Antigua_InundationTable_SOC_ATG_CulturalHeritage_2018_84",
+                "Antigua_InundationTable_SOC_ATG_EmergencyShelters_2019_84",
+                "Antigua_InundationTable_SOC_ATG_Schools_2017_84",
+                "Antigua_InundationTable_TER_ATG_KeyBiodiversityAreas_2020_84",
+                "Antigua_InundationTable_TER_ATG_LandCover_2010_84",
+                "Antigua_InundationTable_INF_ATG_NamedRoads_2016_84",
+                "Antigua_InundationTable_INF_ATG_MedicalFacilities",
+                "Antigua_InundationTable_hotosm_atg_buildings_polygons")
+
+# Data will be loaded into a data frame
+InundationImpactTable <- data.frame(stringsAsFactors = FALSE)
+for (D in 1:length(TableStems)){
+        # Get the DataTable from file
+        #print(D)
+        Data <- read.csv(file = file.path(workingDirectory, paste0(TableStems[D], ".csv")),
+                         stringsAsFactors = FALSE)
+        # Input data into the dataframe as appropriate
+        if (nrow(Data) == 0){
+          InundationImpactTable <- rbind(InundationImpactTable, cbind(
+                                                            Element = TableStems[D],
+                                                            GridCode = NA,
+                                                            Area = NA,
+                                                            Length = NA,
+                                                            NumberID = NA,
+                                                            Name = NA), stringsAsFactors = FALSE)
+  } else {
+    # Strip out the correct data
+    if (D == 1){ # Landmass
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$OBJECTID
+      NameD = rep(NA, nrow(Data))}
+    if (D == 2){ # waterbodies
+      AreaD = Data$AREA 
+      LengthD = rep(NA, nrow(Data)) 
+      NumberIDD = Data$WaterBodyID
+      NameD = rep(NA, nrow(Data))}
+    if (D == 3){ # access roads
+      AreaD = rep(NA, nrow(Data))
+      LengthD = Data$LENGTH
+      NumberIDD = Data$Id
+      NameD = rep(NA, nrow(Data))}
+    if (D == 4){ # airports
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$osm_id
+      NameD = Data$aeroway}
+    if (D == 5){ # electricity wires
+      AreaD = rep(NA, nrow(Data))
+      LengthD =  Data$LENGTH
+      NumberIDD = Data$ElecWireID
+      NameD = rep(NA, nrow(Data))}
+    if (D == 6){ # electricity substations
+      AreaD = rep(NA, nrow(Data))
+      LengthD =  rep(NA, nrow(Data))
+      NumberIDD = Data$SubSt_ID
+      NameD = Data$Name}
+    if (D == 7){  # ALL buildings
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$BldgID
+      NameD = Data$FEATURE}
+    if (D == 8){ # Bus routes
+      AreaD = rep(NA, nrow(Data))
+      LengthD = Data$LENGTH
+      NumberIDD =  Data$Bus_Route
+      NameD = Data$Rou_Name}
+    if (D == 9){ # Dams and reservoirs
+      AreaD = rep(NA, nrow(Data))
+      LengthD =  rep(NA, nrow(Data))
+      NumberIDD = Data$DamR_ID
+      NameD = Data$TYPE}
+    if (D == 10){ # Educational facilities
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data)) 
+      NumberIDD = Data$EdBldg_ID
+      NameD = Data$Label_Name}
+    if (D == 11){ # EV charging points
+      AreaD = rep(NA, nrow(Data))
+      LengthD = rep(NA, nrow(Data)) 
+      NumberIDD = Data$Id
+      NameD = Data$Location}
+    if (D == 12){ # Firestation
+      AreaD = Data$AREA
+      LengthD =  rep(NA, nrow(Data))
+      NumberIDD = Data$ED_No
+      NameD = Data$Label_Name}
+    if (D == 13){ # petrol stations
+      AreaD = rep(NA, nrow(Data))
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$OBJECTID
+      NameD = Data$Comment}
+    if (D == 14){ # Police facilities
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$Police_ID
+      NameD = Data$Label_Name}  
+    if (D == 15){ # pumping stations
+      AreaD = rep(NA, nrow(Data))
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$PumpID
+      NameD = Data$LOCATION}
+    if (D == 16){ # Religous centres
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$RelCen_ID
+      NameD = Data$Label_Name}
+    if (D == 17){ # Sea Ports
+      AreaD = rep(NA, nrow(Data))
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$osm_id
+      NameD = Data$name}
+    if (D == 18){ # Water pipes
+      AreaD = rep(NA, nrow(Data))
+      LengthD = Data$LENGTH
+      NumberIDD = Data$PIPE_ID
+      NameD = Data$LOCATOIN}
+    if (D == 19){ # Water tanks
+      AreaD = rep(NA, nrow(Data))
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$TANK_ID
+      NameD = Data$LOCATION}
+    if (D == 20){ # Water treatment
+      AreaD = rep(NA, nrow(Data))
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$Treat_ID
+      NameD = Data$NAME}
+    if (D == 21){ # Wells
+      AreaD = rep(NA, nrow(Data))
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$WELL_ID
+      NameD = rep(NA, nrow(Data))}
+    if (D == 22){ # Protected Area
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$OBJECTID
+      NameD = Data$land_use}
+    if (D == 23){ # Protected Area - Devils bridge
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$ID
+      NameD = Data$CAPTION}
+    if (D == 24){ # Protected Area - Fort Barrington
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$ID
+      NameD = Data$Name}
+    if (D == 25){ # Protected Area - Greencastle
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$ID
+      NameD = Data$CAPTION}
+    if (D == 26){ # Protected Area - Nelsons Dockyard
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$ID
+      NameD = Data$CAPTION}
+    if (D == 27){ # Protected Area - New Proposed Protected Area
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$id
+      NameD = Data$Place}
+    if (D == 28){ # Clinics
+      AreaD = rep(NA, nrow(Data))
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$Clinic_ID
+      NameD = Data$Name}
+    if (D == 29){ # Cultural sites
+      AreaD = rep(NA, nrow(Data))
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$Id
+      NameD = Data$Theme}
+    if (D == 30){ # Emergency shelters
+      AreaD = rep(NA, nrow(Data))
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$Emer_ID
+      NameD = Data$Type}
+    if (D == 31){ # Schools
+      AreaD = rep(NA, nrow(Data))
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$Id
+      NameD = Data$School}
+    if (D == 32){ # Key biodiversity areas
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$SitRecID
+      NameD = Data$NatName}
+    if (D == 33){ # Land Coverage/use
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$ID
+      NameD = Data$TYPE_2010}
+    if (D == 34){ # Roads
+      AreaD = rep(NA, nrow(Data))
+      LengthD = Data$LENGTH
+      NumberIDD = Data$OBJECTID
+      NameD = Data$ROAD_TYPE_}
+    if (D == 35){ # Medical facilities
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$Med_ID
+      NameD = Data$Label_Name}
+    if (D == 36){ # HoSM buildings
+      AreaD = Data$AREA
+      LengthD = rep(NA, nrow(Data))
+      NumberIDD = Data$osm_id
+      NameD = paste0(Data$office,"-",Data$building)}
+    # Update the table
+    InundationImpactTable <- rbind(InundationImpactTable, cbind(
+                                                            Element = rep(TableStems[D], nrow(Data)),
+                                                            GridCode = Data$gridcode,
+                                                            Area = as.numeric(AreaD),
+                                                            Length = as.numeric(LengthD),
+                                                            NumberID = as.numeric(NumberIDD),
+                                                            Name = NameD) , stringsAsFactors = FALSE)
+    }
+    
+}
+
+InundationImpactTable <- setDT(InundationImpactTable)
+###################################################################
+# Output the data as a series of tables
+# 
+# Note - need to control the fact that bridges, buildings can be covered more than once so need to
+#        unique these, also roads have different classes
+#
+#####################################################################################################
+
+###########################################################
+# Output as kable extra table with data for: 
+#       airports            =   area
+#       buildings           =   area, number
+#       ferry (ports)       =   area, number
+#       roads               =   length
+#       Watercourses        =   number
+###############################################################
+Islands <- c("Antigua")
+FeatureDataFrame <- data.frame(stringsAsFactors = FALSE)
+
+# And gather for Antigua
+
+# Airports
+airports <- sum(InundationImpactTable[Element ==  TableStems[4] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+airportsN <- InundationImpactTable[Element ==  TableStems[4] & !is.na(NumberID),
+                                  .N]
+# Buildings
+buildingN <- nrow(InundationImpactTable[Element ==  TableStems[7] & !is.na(NumberID),  
+                                  .N, by = .(NumberID)])
+buildingAREA <- sum(InundationImpactTable[Element ==  TableStems[7] & !is.na(NumberID), 
+                                  sum(as.numeric(Area)) * 0.001 * 0.001, by = .(NumberID)][, 2], na.rm = TRUE)
+# Schools and education facilities
+schoolsN <- nrow(InundationImpactTable[Element ==  TableStems[31] & !is.na(NumberID),  
+                                  .N, by = .(NumberID)])
+educationFacN <- nrow(InundationImpactTable[Element ==  TableStems[10] & !is.na(NumberID),  
+                                  .N, by = .(NumberID)])
+educationFacAREA <- sum(InundationImpactTable[Element ==  TableStems[10] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+# Buildings according to HoSM
+buildingN_HOSM <- nrow(InundationImpactTable[Element ==  TableStems[36] & !is.na(NumberID),  
+                                  .N, by = .(NumberID)])
+buildingAREA_HOSM <- sum(InundationImpactTable[Element ==  TableStems[36] & !is.na(NumberID), 
+                                  sum(as.numeric(Area)) * 0.001 * 0.001, by = .(NumberID)]$V1, na.rm = TRUE)
+BuildingSchool_N_HOSM <- nrow(InundationImpactTable[Element ==  TableStems[36] & !is.na(NumberID) &
+                                                      (grepl("school", Name)),  
+                                  .N, by = .(NumberID)])
+BuildingSchool_AREA_HOSM <- sum(InundationImpactTable[Element ==  TableStems[36] & !is.na(NumberID)
+                                                      & (grepl("school", Name)), 
+                                  sum(as.numeric(Area)) * 0.001 * 0.001, by = .(NumberID)]$V1, na.rm = TRUE)
+BuildingEducation_N_HOSM <- nrow(InundationImpactTable[Element ==  TableStems[36] & !is.na(NumberID) &
+                                                      (grepl("school", Name) | grepl("university", Name) | grepl("educational_institution", Name)),  
+                                  .N, by = .(NumberID)])
+BuildingEducation_AREA_HOSM <- sum(InundationImpactTable[Element ==  TableStems[36] & !is.na(NumberID)
+                                                      & (grepl("school", Name) | grepl("university", Name) |grepl("educational_institution", Name) ), 
+                                  sum(as.numeric(Area)) * 0.001 * 0.001, by = .(NumberID)]$V1, na.rm = TRUE)
+BuildingGOV_N_HOSM <- nrow(InundationImpactTable[Element ==  TableStems[36] & !is.na(NumberID) &
+                                                      (grepl("government", Name)),  
+                                  .N, by = .(NumberID)])
+BuildingGOV_AREA_HOSM <- sum(InundationImpactTable[Element ==  TableStems[36] & !is.na(NumberID)
+                                                      & (grepl("government", Name)), 
+                                  sum(as.numeric(Area)) * 0.001 * 0.001, by = .(NumberID)]$V1, na.rm = TRUE)
+
+# Ports
+portsN <- (InundationImpactTable[Element ==  TableStems[17] & !is.na(NumberID),
+                                  .N])
+# All roads and road transport
+road_ALL_L <- sum(InundationImpactTable[Element ==  TableStems[34] & !is.na(NumberID), 
+                                        max(as.numeric(Length)* 0.001), 
+                                        by = NumberID]$V1)
+road_ALL_N <- nrow(InundationImpactTable[Element ==  TableStems[34]& !is.na(NumberID),
+                                  .N, by = NumberID])
+road_AccessL <- sum(InundationImpactTable[Element ==  TableStems[3] & !is.na(NumberID), 
+                                        max(as.numeric(Length)* 0.001), 
+                                        by = NumberID]$V1)
+road_AccessN <- nrow(InundationImpactTable[Element ==  TableStems[3] & !is.na(NumberID), 
+                                        .N, 
+                                        by = NumberID])
+# residential, tertiary and service roads
+roadsL_Major <- sum(InundationImpactTable[Element ==  TableStems[34] &
+                                        (Name == "ST") & !is.na(NumberID), 
+                                        max(as.numeric(Length)* 0.001), 
+                                        by = NumberID]$V1)
+roadsN_Major <- nrow(InundationImpactTable[Element ==  TableStems[34] &
+                                        (Name == "ST") & !is.na(NumberID), 
+                                        .N, 
+                                        by = NumberID])
+# tracks and paths
+roadsL_Trail <- sum(InundationImpactTable[Element ==  TableStems[34] &
+                                        (Name != "ST" &
+                                          Name != "AV") & !is.na(NumberID), 
+                                        max(as.numeric(Length)* 0.001), 
+                                        by = NumberID]$V1)
+roadsN_Trail <- nrow(InundationImpactTable[Element ==  TableStems[34] &
+                                        (Name != "ST" &
+                                          Name != "AV") & !is.na(NumberID), 
+                                        .N, 
+                                        by = NumberID])
+# unclassified
+roadsL_Minor <- sum(InundationImpactTable[Element ==  TableStems[34] &
+                                        (Name == "AV") & !is.na(NumberID), 
+                                        max(as.numeric(Length)* 0.001), 
+                                        by = NumberID]$V1)
+roadsN_Minor <- nrow(InundationImpactTable[Element ==  TableStems[34] &
+                                        (Name == "AV") & !is.na(NumberID), 
+                                        .N, 
+                                        by = NumberID])
+
+road_busRoutesL <- sum(InundationImpactTable[Element ==  TableStems[8] & !is.na(NumberID), 
+                                        max(as.numeric(Length)* 0.001), 
+                                        by = NumberID]$V1)
+road_busRoutesN <- nrow(InundationImpactTable[Element ==  TableStems[8],
+                                  .N, by = Name])
+road_EV_PointsN <- nrow(InundationImpactTable[Element ==  TableStems[11]& !is.na(NumberID),
+                                  .N, by = NumberID])
+road_GasStationsN <- nrow(InundationImpactTable[Element ==  TableStems[13]& !is.na(NumberID),
+                                  .N, by = NumberID])
+# Water facilities
+water_TreatmentStations <- nrow(InundationImpactTable[Element ==  TableStems[20]& !is.na(NumberID),
+                                    .N, by = NumberID])
+water_PumpingStations <- nrow(InundationImpactTable[Element ==  TableStems[15] & !is.na(NumberID),
+                                    .N, by = NumberID])
+water_PipesL <- sum(InundationImpactTable[Element ==  TableStems[18] & !is.na(NumberID), 
+                                        max(as.numeric(Length)* 0.001), 
+                                        by = NumberID]$V1)
+water_PipesN <- nrow(InundationImpactTable[Element ==  TableStems[18]& !is.na(NumberID),
+                                  .N, by = NumberID])
+water_TanksN <- nrow(InundationImpactTable[Element ==  TableStems[19]& !is.na(NumberID),
+                                  .N, by = NumberID])
+water_WellsN <- nrow(InundationImpactTable[Element ==  TableStems[21]& !is.na(NumberID),
+                                  .N, by = NumberID])
+water_Reservoirs <- nrow(InundationImpactTable[Element ==  TableStems[9]& !is.na(NumberID),
+                                  .N, by = NumberID])
+water_waterBodiesAREA <- sum(InundationImpactTable[Element ==  TableStems[2] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+water_waterBodiesN <- nrow(InundationImpactTable[Element ==  TableStems[2] & !is.na(NumberID),  
+                                  .N, by = NumberID])
+
+# Electricity facilities
+Elec_WiresL <- sum(InundationImpactTable[Element ==  TableStems[5] & !is.na(NumberID), 
+                                        max(as.numeric(Length)* 0.001), 
+                                        by = NumberID]$V1)
+Elec_SubSt <- nrow(InundationImpactTable[Element ==  TableStems[6] & !is.na(NumberID),
+                                  .N, by = NumberID])
+
+# Emergency services
+Emer_PoliceAREA <- sum(InundationImpactTable[Element ==  TableStems[14] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Emer_PoliceN <- nrow(InundationImpactTable[Element ==  TableStems[14] & !is.na(NumberID),  
+                                  .N, by = NumberID])
+Emer_FireAREA <- sum(InundationImpactTable[Element ==  TableStems[12] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Emer_FireN <- nrow(InundationImpactTable[Element ==  TableStems[12] & !is.na(NumberID),  
+                                  .N, by = NumberID])
+Emer_SheltersN <- nrow(InundationImpactTable[Element ==  TableStems[30] & !is.na(NumberID),  
+                                  .N, by = NumberID])
+Emer_MedicalFacAREA <- sum(InundationImpactTable[Element ==  TableStems[35] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Emer_MedicalFacN <- nrow(InundationImpactTable[Element ==  TableStems[35] & !is.na(NumberID),  
+                                  .N, by = NumberID])
+
+# Social facilities
+Social_Clinics <- nrow(InundationImpactTable[Element ==  TableStems[28] & !is.na(NumberID),  
+                                  .N, by = NumberID])
+Social_Heritage <- nrow(InundationImpactTable[Element ==  TableStems[29] & !is.na(NumberID),  
+                                  .N, by = NumberID])
+Social_ReligiousAREA <- sum(InundationImpactTable[Element ==  TableStems[16] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Social_ReligiousN <- nrow(InundationImpactTable[Element ==  TableStems[16] & !is.na(NumberID),  
+                                  .N, by = NumberID])
+
+# Land area and protected sites
+Land_TotalAREA <- sum(InundationImpactTable[Element ==  TableStems[1] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Land_CoverAREA <- sum(InundationImpactTable[Element ==  TableStems[33] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Land_Cover_Agri_AREA <- sum(InundationImpactTable[Element ==  TableStems[33] & !is.na(NumberID) &
+                                                (grepl("Agriculture", Name)), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Land_Cover_Sett_AREA <- sum(InundationImpactTable[Element ==  TableStems[33] & !is.na(NumberID) &
+                                                (grepl("Settlement", Name)), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Land_Cover_Forest_AREA <- sum(InundationImpactTable[Element ==  TableStems[33] & !is.na(NumberID) &
+                                                (grepl("Forest", Name)), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Land_Cover_Industrial_AREA <- sum(InundationImpactTable[Element ==  TableStems[33] & !is.na(NumberID) &
+                                                (grepl("Industrial", Name)),
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Land_Cover_Wetland_AREA <- sum(InundationImpactTable[Element ==  TableStems[33] & !is.na(NumberID) &
+                                                (grepl("Wetland", Name) |grepl("Water bodies", Name)), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+
+Land_BioDivAREA <- sum(InundationImpactTable[Element ==  TableStems[32] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Land_PRT_BPNP_AREA <- sum(InundationImpactTable[Element ==  TableStems[22] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Land_PRT_Devils_AREA <- sum(InundationImpactTable[Element ==  TableStems[23] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Land_PRT_Fort_AREA <- sum(InundationImpactTable[Element ==  TableStems[24] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Land_PRT_Castle_AREA <- sum(InundationImpactTable[Element ==  TableStems[25] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Land_PRT_Nelson_AREA <- sum(InundationImpactTable[Element ==  TableStems[26] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+Land_PRT_SMMA_AREA <- sum(InundationImpactTable[Element ==  TableStems[27] & !is.na(NumberID), 
+                                        max(as.numeric(Area)* 0.001 * 0.001), 
+                                        by = NumberID]$V1)
+
+# Collect up into a data frame FEATURE/AREA/LENGTH/NUMBER
+features <- c("Airport Facilities", "Ferry Terminals - Number","Buildings", "Buildings - schools", "Buildings - Education Facilities",  "All Roads", "Access road","Major roads (streets)", "Minor roads (avenues)", "Trails (unclassified)", "Bus Routes", "EV Charge Points", "Gas Stations","Electricity Wires", "Electricity Substations", "Police", "Fire Brigade", "Emergency Shelters", "Medical Facilities", "Clinics", "Heritage", "Religous Centres", "Water bodies", "Treatment Plants", "Pumping Stations", "Tanks", "Reservoirs", "Wells", "Pipes", "Total Area", "Land Coverage Area (Total)", "Land Coverage Area (Agriculture)",  "Land Coverage Area (Settlement)","Land Coverage Area (Forest)","Land Coverage Area (Industrial)","Land Coverage Area (Wetland)","Protect Area - BPNP", "Protect Area - Devils Bridge", "Protect Area - Fort Barrington", "Protect Area - Greencastle Hill", "Protect Area - Nelson Dockyard", "Protect Area - SMMA", "Key Biodiversity Sites", "HOSM - All", "HOSM - Schools", "HOSM - Education", "HOSM - Government")
+AreaFactor <- 1000 * 1000 # To convert back to m2
+FeatureDataFrame <- rbind(FeatureDataFrame,
+      c(features[1], round(airports * AreaFactor, digits = 7), NA, round(airportsN, digits = 2)), # Airport area and number of facilities
+      c(features[2], NA, NA, round(portsN, digits = 2)), # number of ferry terminals
+      
+      c(features[3], round(buildingAREA * AreaFactor, digits = 7), NA, round(buildingN, digits = 2)), # Number of buildings & area (all)
+      c(features[4], NA, NA, round(schoolsN, digits = 2)), # Number of schools
+      c(features[5], round(educationFacAREA * AreaFactor, digits = 7), NA, round(educationFacN, digits = 2)), # number & area of education facilities
+      
+      c(features[6], NA, round(road_ALL_L, digits = 2), round(road_ALL_N, digits = 2)), # All roads Length and number
+      c(features[7], NA, round(road_AccessL, digits = 2), round(road_AccessN, digits = 2)), # Access roads Length
+      c(features[8], NA, round(roadsL_Major, digits = 2), round(roadsN_Major, digits = 2)), # Major roads - streets
+      c(features[9], NA, round(roadsL_Minor, digits = 2), round(roadsN_Minor, digits = 2)), # Minor roads - avenues
+      c(features[10], NA, round(roadsL_Trail, digits = 2), round(roadsN_Trail, digits = 2)), # Trials - unclassified
+      
+      c(features[11], NA, round(road_busRoutesL, digits = 2), round(road_busRoutesN, digits = 2)), # Bus routes Length and number
+      c(features[12], NA, NA, round(road_EV_PointsN, digits = 2)), # Electric vehicle charging points
+      c(features[13], NA, NA, round(road_GasStationsN, digits = 2)), # Petrol stations
+      
+      c(features[14], NA, round(Elec_WiresL, digits = 2), NA), # Electricity wire length
+      c(features[15], NA, NA, round(Elec_SubSt, digits = 2)), # Electricity substations
+      
+      c(features[16], round(Emer_PoliceAREA * AreaFactor, digits = 7), NA, round(Emer_PoliceN, digits = 2)),# Emergency service - police
+      c(features[17], round(Emer_FireAREA * AreaFactor, digits = 7), NA, round(Emer_FireN, digits = 2)), # Emergency service - Fire
+      c(features[18], NA, NA, round(Emer_SheltersN, digits = 7)),# Emergency service - Shelters
+      c(features[19], round(Emer_MedicalFacAREA * AreaFactor, digits = 7), NA, round(Emer_MedicalFacN, digits = 2)), # Emergency service - Medical
+      
+      c(features[20], NA, NA, round(Social_Clinics, digits = 2)), # Social - Clinics
+      c(features[21], NA, NA, round(Social_Heritage, digits = 2)), # Social - Heritage
+      c(features[22], round(Social_ReligiousAREA * AreaFactor, digits = 7), NA, round(Social_ReligiousN, digits = 2)),# Social - Religous area and number
+      
+      c(features[23], round(water_waterBodiesAREA * AreaFactor, digits = 7), NA, round(water_waterBodiesN, digits = 2)),# Water bodies area and number
+      c(features[24], NA, NA, round(water_TreatmentStations, digits = 2)),# Treatment plants
+      c(features[25], NA, NA, round(water_PumpingStations, digits = 2)),# Pumping stations
+      c(features[26], NA, NA, round(water_TanksN, digits = 2)),# Tanks
+      c(features[27], NA, NA, round(water_Reservoirs, digits = 2)),# Reservoirs
+      c(features[28], NA, NA, round(water_WellsN, digits = 2)),# Wells
+      c(features[29], NA, round(water_PipesL, digits = 2), round(water_PipesN, digits = 2)),# Pipes
+      
+      c(features[30], round(Land_TotalAREA * AreaFactor, digits = 7), NA, NA),# Total Land Area
+      c(features[31], round(Land_CoverAREA * AreaFactor, digits = 7), NA, NA),# Land Coverage Area (Total)
+      c(features[32], round(Land_Cover_Agri_AREA * AreaFactor, digits = 7), NA, NA),# Land Coverage Area (Agriculture)
+      c(features[33], round(Land_Cover_Sett_AREA * AreaFactor, digits = 7), NA, NA),# Land Coverage Area (Settlement)
+      c(features[34], round(Land_Cover_Forest_AREA * AreaFactor, digits = 7), NA, NA),# Land Coverage Area (Forest)
+      c(features[35], round(Land_Cover_Industrial_AREA * AreaFactor, digits = 7), NA, NA),# Land Coverage Area (Industrial)
+      c(features[36], round(Land_Cover_Wetland_AREA * AreaFactor, digits = 7), NA, NA),# Land Coverage Area (Wetland)
+    
+      c(features[37], round(Land_PRT_BPNP_AREA * AreaFactor, digits = 7), NA, NA), # Protected Areas - BPNP
+      c(features[38], round(Land_PRT_Devils_AREA * AreaFactor, digits = 7), NA, NA),# Protected Areas - Devils Bridge
+      c(features[39], round(Land_PRT_Fort_AREA * AreaFactor, digits = 7), NA, NA),# Protected Areas - Fort Barrington
+      c(features[40], round(Land_PRT_Castle_AREA * AreaFactor, digits = 7), NA, NA),# Protected Areas - Greencastle Hill
+      c(features[41], round(Land_PRT_Nelson_AREA * AreaFactor, digits = 7), NA, NA),# Protected Areas - Nelsons Dockyard
+      c(features[42], round(Land_PRT_SMMA_AREA * AreaFactor, digits = 7), NA, NA),# Protected Areas - SMMA
+      
+      c(features[43], round(Land_BioDivAREA * AreaFactor, digits = 7), NA, NA), # Protected Areas - Key Biodiversity Areas
+      
+      c(features[44], round(buildingN_HOSM * AreaFactor, digits = 7), NA, round(buildingN_HOSM, digits = 2)), # HOSM - all
+      c(features[45], round(BuildingSchool_AREA_HOSM * AreaFactor, digits = 7), NA, round(BuildingSchool_N_HOSM, digits = 2)), # Hosm - Schools
+      c(features[46], round(BuildingEducation_AREA_HOSM * AreaFactor, digits = 7), NA, round(BuildingEducation_N_HOSM, digits = 2)), # Hosm - Education
+      c(features[47], round(BuildingGOV_AREA_HOSM * AreaFactor, digits = 7), NA, round(BuildingGOV_N_HOSM, digits = 2)) # Hosm - GOVN
+          , stringsAsFactors = FALSE)
+colnames(FeatureDataFrame) <- c("Feature", "Area", "Length", "Number")
+
+
+##############################################################
+# Tables
+##############################################################
+
+library(kableExtra)
+Table1 <- knitr::kable(FeatureDataFrame,
+                       col.names = c("Feature", "Area (m^2^)", "Length (km)", "Number")) %>%
+    pack_rows("Air and Sea Travel", 1, 2) %>%
+    pack_rows("Buildings", 3, 5) %>%
+    pack_rows("Roads", 6,13) %>%
+    pack_rows("Electricity", 14,15) %>%
+    pack_rows("Emergency Facilities", 16,19) %>%
+    pack_rows("Social Facilities", 20,22) %>%
+    pack_rows("Water facilities", 23,29) %>%
+    pack_rows("Land Coverage", 30,37) %>%
+    pack_rows("Protected Areas", 38,42) %>%
+    pack_rows("Key Biodiversity Areas", 43,43) %>%
+  pack_rows("Humanitarian Open Street Map", 44,46) %>%
+   kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+### Table showing the impact of the inundation caused by the IRMA Storm Surge
+
+Below is the table of the impact caused by IRMA's storm surge on features on Antigua This is the impact of having some inundation (>0m).
+
+`r Table1`
